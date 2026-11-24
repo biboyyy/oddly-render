@@ -6,6 +6,7 @@ on:
       chunks: {required: false, type: string, default: "16"}
       assets: {required: true, type: string}
       nonce: {required: false, type: string, default: ""}
+      only: {required: false, type: string, default: ""}
 run-name: render ${{ inputs.ep }} ${{ inputs.nonce }}
 permissions:
   contents: read
@@ -17,7 +18,7 @@ jobs:
       matrix: ${{ steps.m.outputs.matrix }}
     steps:
       - id: m
-        run: python3 -c "import json;n=int('${{ inputs.chunks }}');print('matrix='+json.dumps({'idx':[-1]+list(range(n))}))" >> "$GITHUB_OUTPUT"
+        run: python3 -c "import json;n=int('${{ inputs.chunks }}');o='${{ inputs.only }}'.strip();idx=[int(x) for x in o.split(',')] if o else [-1]+list(range(n));print('matrix='+json.dumps({'idx':idx}))" >> "$GITHUB_OUTPUT"
   render:
     needs: plan
     runs-on: ubuntu-latest
@@ -63,16 +64,17 @@ jobs:
           set -e
           IDX=${{ matrix.idx }}
           N=${{ inputs.chunks }}
-          COMMON="--gl=swangle --timeout=120000 --log=error"
+          COMMON="--gl=swangle --timeout=480000 --log=error"
+          retry() { "$@" || { echo "retry 1"; sleep 5; "$@"; } || { echo "retry 2"; sleep 5; "$@"; }; }
           mkdir -p /tmp/out
           if [ "$IDX" = "-1" ]; then
-            npx remotion render src/index.ts "ODDLY-$EP" /tmp/out/audio.wav --codec=wav $COMMON
+            retry npx remotion render src/index.ts "ODDLY-$EP" /tmp/out/audio.wav --codec=wav $COMMON
             OUT=/tmp/out/audio.wav; NAME=audio
           else
             read S E < <(python3 -c "import json,math;t=int(json.load(open('src/generated/$EP.json'))['durationInFrames']);n=$N;sz=math.ceil(t/n);s=$IDX*sz;print(s,min(s+sz,t)-1)")
             if [ "$S" -gt "$E" ]; then echo "empty chunk"; exit 0; fi
             NAME=$(printf "part_%05d" "$S")
-            npx remotion render src/index.ts "ODDLY-$EP" "/tmp/out/$NAME.mp4" --frames=$S-$E --muted --codec=h264 --crf=17 --pixel-format=yuv420p --concurrency=4 $COMMON
+            retry npx remotion render src/index.ts "ODDLY-$EP" "/tmp/out/$NAME.mp4" --frames=$S-$E --muted --codec=h264 --crf=17 --pixel-format=yuv420p --concurrency=4 $COMMON
             OUT=/tmp/out/$NAME.mp4
           fi
           mkdir -p /tmp/up
