@@ -1,0 +1,40 @@
+{
+  "name": "oddly-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ODDLY automated short-form 3D educational video production pipeline",
+  "scripts": {
+    "produce": "node scripts/produce.mjs",
+    "studio": "remotion studio src/index.ts",
+    "preview": "remotion studio src/index.ts",
+    "render": "node scripts/produce.mjs --only compose,qc",
+    "stills": "node scripts/produce.mjs --stills",
+    "narrator:export": "remotion still src/index.ts NarratorSheet public/narrator/narrator_sheet.png --image-format=png",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "@img/sharp-libvips-linux-x64": "^1.3.4",
+    "@img/sharp-linux-x64": "^0.35.5",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@react-three/postprocessing": "^3.2.2",
+    "@remotion/cli": "4.0.542",
+    "@remotion/three": "4.0.542",
+    "meshoptimizer": "^1.3.0",
+    "postprocessing": "^6.39.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.542",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/three": "^0.187.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

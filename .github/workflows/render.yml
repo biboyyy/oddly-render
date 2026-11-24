@@ -1,0 +1,87 @@
+name: render
+on:
+  workflow_dispatch:
+    inputs:
+      ep: {required: true, type: string}
+      chunks: {required: false, type: string, default: "16"}
+      assets: {required: true, type: string}
+      nonce: {required: false, type: string, default: ""}
+run-name: render ${{ inputs.ep }} ${{ inputs.nonce }}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: python3 -c "import json;n=int('${{ inputs.chunks }}');print('matrix='+json.dumps({'idx':[-1]+list(range(n))}))" >> "$GITHUB_OUTPUT"
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      K: ${{ secrets.RENDER_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      EP: ${{ inputs.ep }}
+      NODE_OPTIONS: --dns-result-order=ipv4first
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: npm i -g pnpm@12.15.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.cache/pnpm
+          key: pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm install --frozen-lockfile || pnpm install
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.remotion
+          key: remotion-browser-4.0.542
+      - run: npx remotion browser ensure
+      - name: fetch + decrypt inputs
+        run: |
+          set -e
+          dl() { gh release download "$1" -R "$GITHUB_REPOSITORY" -p "$2" -O "/tmp/$2"; }
+          dl "${{ inputs.assets }}" assets.tar.enc
+          dl "ep-$EP" "$EP.tar.enc"
+          for f in assets.tar.enc "$EP.tar.enc"; do
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass env:K -in "/tmp/$f" | tar -x -C .
+          done
+          rm -f /tmp/*.enc
+      - name: render
+        run: |
+          set -e
+          IDX=${{ matrix.idx }}
+          N=${{ inputs.chunks }}
+          COMMON="--gl=swangle --timeout=120000 --log=error"
+          mkdir -p /tmp/out
+          if [ "$IDX" = "-1" ]; then
+            npx remotion render src/index.ts "ODDLY-$EP" /tmp/out/audio.wav --codec=wav $COMMON
+            OUT=/tmp/out/audio.wav; NAME=audio
+          else
+            read S E < <(python3 -c "import json,math;t=int(json.load(open('src/generated/$EP.json'))['durationInFrames']);n=$N;sz=math.ceil(t/n);s=$IDX*sz;print(s,min(s+sz,t)-1)")
+            if [ "$S" -gt "$E" ]; then echo "empty chunk"; exit 0; fi
+            NAME=$(printf "part_%05d" "$S")
+            npx remotion render src/index.ts "ODDLY-$EP" "/tmp/out/$NAME.mp4" --frames=$S-$E --muted --codec=h264 --crf=17 --pixel-format=yuv420p --concurrency=4 $COMMON
+            OUT=/tmp/out/$NAME.mp4
+          fi
+          mkdir -p /tmp/up
+          openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -pass env:K -in "$OUT" -out "/tmp/up/$NAME.enc"
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        if: env.NAME != ''
+        with:
+          name: ${{ env.NAME }}
+          path: /tmp/up/${{ env.NAME }}.enc
+          retention-days: 1
+          compression-level: 0

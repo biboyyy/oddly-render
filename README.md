@@ -1,2 +1,1 @@
-# oddly-render
-render runner (inputs/outputs encrypted)
+Render runner. Assets, episode data and outputs are encrypted.
