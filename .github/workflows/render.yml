@@ -5,12 +5,20 @@ on:
       ep: {required: true, type: string}
       chunks: {required: false, type: string, default: "16"}
       assets: {required: true, type: string}
-      nonce: {required: false, type: string, default: ""}
+      nonce: {required: true, type: string}
       only: {required: false, type: string, default: ""}
+      stills: {required: false, type: string, default: ""}
+      scale: {required: false, type: string, default: "0.5"}
 run-name: render ${{ inputs.ep }} ${{ inputs.nonce }}
 permissions:
-  contents: read
+  contents: write
   actions: read
+env:
+  K: ${{ secrets.RENDER_KEY }}
+  GH_TOKEN: ${{ github.token }}
+  EP: ${{ inputs.ep }}
+  TAG: out-${{ inputs.nonce }}
+  NODE_OPTIONS: --dns-result-order=ipv4first
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -18,7 +26,23 @@ jobs:
       matrix: ${{ steps.m.outputs.matrix }}
     steps:
       - id: m
-        run: python3 -c "import json;n=int('${{ inputs.chunks }}');o='${{ inputs.only }}'.strip();idx=[int(x) for x in o.split(',')] if o else [-1]+list(range(n));print('matrix='+json.dumps({'idx':idx}))" >> "$GITHUB_OUTPUT"
+        env:
+          N: ${{ inputs.chunks }}
+          ONLY: ${{ inputs.only }}
+          STILLS: ${{ inputs.stills }}
+        run: |
+          python3 - >> "$GITHUB_OUTPUT" <<'E'
+          import json, os
+          n = int(os.environ["N"]); o = os.environ["ONLY"].strip(); s = os.environ["STILLS"].strip()
+          if s:
+              items = [x for x in s.split(",") if x.strip()]
+              per = max(1, -(-len(items) // 16))
+              idx = [1000 + i for i in range(-(-len(items) // per))]
+          else:
+              idx = [int(x) for x in o.split(",")] if o else [-1] + list(range(n))
+          print("matrix=" + json.dumps({"idx": idx}))
+          E
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --prerelease -t "$TAG" -n "encrypted outputs" || true
   render:
     needs: plan
     runs-on: ubuntu-latest
@@ -27,11 +51,6 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
-    env:
-      K: ${{ secrets.RENDER_KEY }}
-      GH_TOKEN: ${{ github.token }}
-      EP: ${{ inputs.ep }}
-      NODE_OPTIONS: --dns-result-order=ipv4first
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,22 +71,39 @@ jobs:
       - name: fetch + decrypt inputs
         run: |
           set -e
-          dl() { gh release download "$1" -R "$GITHUB_REPOSITORY" -p "$2" -O "/tmp/$2"; }
-          dl "${{ inputs.assets }}" assets.tar.enc
-          dl "ep-$EP" "$EP.tar.enc"
-          for f in assets.tar.enc "$EP.tar.enc"; do
-            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass env:K -in "/tmp/$f" | tar -x -C .
+          gh release download "${{ inputs.assets }}" -R "$GITHUB_REPOSITORY" -p assets.tar.enc -O /tmp/a.enc
+          gh release download "ep-$EP" -R "$GITHUB_REPOSITORY" -p "$EP.tar.enc" -O /tmp/e.enc
+          for f in /tmp/a.enc /tmp/e.enc; do
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass env:K -in "$f" | tar -x -C .
           done
           rm -f /tmp/*.enc
       - name: render
+        env:
+          STILLS: ${{ inputs.stills }}
+          SCALE: ${{ inputs.scale }}
+          IDX: ${{ matrix.idx }}
         run: |
           set -e
-          IDX=${{ matrix.idx }}
           N=${{ inputs.chunks }}
           COMMON="--gl=swangle --timeout=480000 --log=error"
           retry() { "$@" || { echo "retry 1"; sleep 5; "$@"; } || { echo "retry 2"; sleep 5; "$@"; }; }
           mkdir -p /tmp/out
-          if [ "$IDX" = "-1" ]; then
+          if [ "$IDX" -ge 1000 ]; then
+            npx remotion bundle src/index.ts --out-dir /tmp/bundle --log=error
+            python3 - > /tmp/jobs.txt <<'E'
+          import os
+          items = [x.strip() for x in os.environ["STILLS"].split(",") if x.strip()]
+          per = max(1, -(-len(items) // 16)); g = int(os.environ["IDX"]) - 1000
+          for it in items[g * per:(g + 1) * per]:
+              label, _, fr = it.rpartition("@"); print(label or "f%05d" % int(fr), fr)
+          E
+            mkdir -p /tmp/stills
+            while read L F; do
+              retry npx remotion still /tmp/bundle "ODDLY-$EP" "/tmp/stills/$L.jpg" --frame=$F --scale=$SCALE --image-format=jpeg --jpeg-quality=88 $COMMON
+            done < /tmp/jobs.txt
+            tar -C /tmp/stills -cf /tmp/out/s.tar .
+            NAME=$(printf "stills_%04d" "$IDX"); OUT=/tmp/out/s.tar
+          elif [ "$IDX" = "-1" ]; then
             retry npx remotion render src/index.ts "ODDLY-$EP" /tmp/out/audio.wav --codec=wav $COMMON
             OUT=/tmp/out/audio.wav; NAME=audio
           else
@@ -77,13 +113,39 @@ jobs:
             retry npx remotion render src/index.ts "ODDLY-$EP" "/tmp/out/$NAME.mp4" --frames=$S-$E --muted --codec=h264 --crf=17 --pixel-format=yuv420p --concurrency=4 $COMMON
             OUT=/tmp/out/$NAME.mp4
           fi
-          mkdir -p /tmp/up
-          openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -pass env:K -in "$OUT" -out "/tmp/up/$NAME.enc"
-          echo "NAME=$NAME" >> "$GITHUB_ENV"
-      - uses: actions/upload-artifact@v4
-        if: env.NAME != ''
-        with:
-          name: ${{ env.NAME }}
-          path: /tmp/up/${{ env.NAME }}.enc
-          retention-days: 1
-          compression-level: 0
+          openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -pass env:K -in "$OUT" -out "/tmp/$NAME.enc"
+          for i in 1 2 3; do gh release upload "$TAG" "/tmp/$NAME.enc" --clobber -R "$GITHUB_REPOSITORY" && break; sleep 5; done
+  assemble:
+    needs: render
+    if: ${{ always() && inputs.stills == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: assemble final + telegram copy
+        run: |
+          set -e
+          which ffmpeg || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+          mkdir -p /tmp/w && cd /tmp/w
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "part_*.enc" -p "audio.enc"
+          for f in *.enc; do
+            b=${f%.enc}; ext=mp4; [ "$b" = audio ] && ext=wav
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass env:K -in "$f" -out "$b.$ext"; rm "$f"
+          done
+          gh release download "ep-$EP" -R "$GITHUB_REPOSITORY" -p "$EP.tar.enc" -O /tmp/e.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass env:K -in /tmp/e.enc | tar -x -C /tmp/w "src/generated/$EP.json"
+          T=$(python3 -c "import json;print(json.load(open('src/generated/$EP.json'))['durationInFrames'])")
+          N=${{ inputs.chunks }}
+          EXPECT=$(python3 -c "import math;t=$T;n=$N;sz=math.ceil(t/n);print(len([i for i in range(n) if i*sz<t]))")
+          HAVE=$(ls part_*.mp4 | wc -l)
+          [ -f audio.wav ] || { echo "missing audio"; exit 1; }
+          [ "$HAVE" = "$EXPECT" ] || { echo "parts $HAVE/$EXPECT"; exit 1; }
+          ls part_*.mp4 | sort | sed "s/.*/file '&'/" > list.txt
+          ffmpeg -v error -y -f concat -safe 0 -i list.txt -c copy video.mp4
+          ffmpeg -v error -y -i video.mp4 -i audio.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest master.mp4
+          ffmpeg -v error -y -i master.mp4 -c:v copy -af loudnorm=I=-14:TP=-1.5:LRA=11 -c:a aac -b:a 192k -ar 48000 -movflags +faststart final.mp4
+          D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 final.mp4)
+          VB=$(python3 -c "d=float('$D');print(min(3000,int(45*8*1024/d-140)))")
+          ffmpeg -v error -y -i final.mp4 -c:v libx264 -preset slow -b:v ${VB}k -maxrate $((VB*12/10))k -bufsize $((VB*2))k -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart tg.mp4
+          FR=$(ffprobe -v error -count_packets -select_streams v:0 -show_entries stream=nb_read_packets -of csv=p=0 video.mp4)
+          echo "frames $FR / $T"
+          for f in final tg; do openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -pass env:K -in $f.mp4 -out $f.enc; done
+          gh release upload "$TAG" final.enc tg.enc --clobber -R "$GITHUB_REPOSITORY"
