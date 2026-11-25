@@ -165,7 +165,7 @@ export const Character: React.FC<{ id: string; look: Look; pose: CharPose; brain
             {look.hairStyle === 'hijab' && (
               <>
                 {/* khimar: soft cape over the shoulders + rounded front panel to mid-chest + back panel (replaces the old neck cone that poked through the shirt) */}
-                <Prim kind="sphere" mat={m.hair} pos={[0, 0.0, 0.46]} scale={[0.235, 0.155, 0.1]} args={{ seg: 32 }} outline={0.007} />
+                <Prim kind="sphere" mat={m.hair} pos={[0, 0.0, 0.465]} scale={[0.27, 0.16, 0.115]} args={{ seg: 32 }} outline={0.007} />
                 <Prim kind="sphere" mat={m.hair} pos={[0, -0.118, 0.39]} scale={[0.175, 0.04, 0.13]} args={{ seg: 32 }} outline={0.006} />
                 <Prim kind="sphere" mat={m.hair} pos={[0, 0.118, 0.39]} scale={[0.185, 0.04, 0.13]} args={{ seg: 32 }} outline={0.006} />
               </>
