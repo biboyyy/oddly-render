@@ -161,7 +161,15 @@ export const Character: React.FC<{ id: string; look: Look; pose: CharPose; brain
                 <Prim kind="cyl" color="#C9D3E0" pos={[0.06, -0.13, 0.27]} scale={[0.025, 0.025, 0.012]} rot={[Math.PI / 2, 0, 0]} outline={0.004} />
               </>
             )}
-            {look.outfit === 'tee' && <Prim kind="box" color={m.topDark} pos={[0, -0.118, 0.47]} scale={[0.07, 0.006, 0.02]} outline={0.003} />}
+            {look.outfit === 'tee' && look.hairStyle !== 'hijab' && <Prim kind="box" color={m.topDark} pos={[0, -0.118, 0.47]} scale={[0.07, 0.006, 0.02]} outline={0.003} />}
+            {look.hairStyle === 'hijab' && (
+              <>
+                {/* khimar: soft cape over the shoulders + rounded front panel to mid-chest + back panel (replaces the old neck cone that poked through the shirt) */}
+                <Prim kind="sphere" mat={m.hair} pos={[0, 0.0, 0.46]} scale={[0.235, 0.155, 0.1]} args={{ seg: 32 }} outline={0.007} />
+                <Prim kind="sphere" mat={m.hair} pos={[0, -0.118, 0.39]} scale={[0.175, 0.04, 0.13]} args={{ seg: 32 }} outline={0.006} />
+                <Prim kind="sphere" mat={m.hair} pos={[0, 0.118, 0.39]} scale={[0.185, 0.04, 0.13]} args={{ seg: 32 }} outline={0.006} />
+              </>
+            )}
             {look.kurta && (
               <>
                 {/* EP022 kurta: long shirt skirt below the waist + button placket */}
@@ -197,7 +205,7 @@ export const Character: React.FC<{ id: string; look: Look; pose: CharPose; brain
               {look.outfit === 'hoodie' && <Prim kind="sphere" color={m.topDark} pos={[0, 0.1, 0.02]} scale={[0.17, 0.08, 0.07]} />}
               <N m={local.neck}>
                 <Prim kind="cyl" mat={m.skinBody} pos={[0, 0, 0.04]} scale={[0.055, 0.055, 0.09]} outline={0.006} />
-                {look.hairStyle === 'hijab' && <Prim kind="cone" mat={m.hair} pos={[0, 0.02, -0.02]} scale={[0.29, 0.25, 0.27]} args={{ seg: 32 }} outline={0.008} />}
+                {look.hairStyle === 'hijab' && <Prim kind="cyl" mat={m.hair} pos={[0, 0.0, 0.03]} scale={[0.085, 0.08, 0.11]} args={{ seg: 28 }} outline={0.006} />}
                 {look.helmet && <Prim kind="torus" color="#C9D3E0" pos={[0, 0, 0.0]} scale={[0.16, 0.16, 0.2]} args={{ tube: 0.22, seg: 32 }} outline={0.006} />}
                 <N m={local.head}>
                   {look.helmet && (
@@ -214,7 +222,7 @@ export const Character: React.FC<{ id: string; look: Look; pose: CharPose; brain
                     <mesh geometry={HEAD_GEO} material={headOutline} position={[0, 0, 0.21]} scale={[RX, RY, RZ]} />
                     <mesh geometry={HEAD_GEO} material={m.skin} position={[0, -0.03, 0.12]} scale={[0.165, 0.15, 0.11]} castShadow receiveShadow />
                   </group>
-                  {[-1, 1].map((sx) => (
+                  {look.hairStyle !== 'hijab' && [-1, 1].map((sx) => (
                     <Prim key={sx} kind="sphere" mat={m.skin} pos={[sx * 0.205, 0, 0.2]} scale={[0.035, 0.025, 0.05]} outline={x > 0.5 ? false : 0.006} />
                   ))}
                   <Prim kind="sphere" mat={m.skin} pos={[0, -0.205, 0.175]} scale={[0.02, 0.022, 0.024]} outline={false} />
