@@ -120,7 +120,7 @@ export const ARM_POSES: Record<string, Pose> = {
   relaxed: { t: [0.29, -0.1, -0.5], pole: [0.4, 1, -0.3] },
   hold_head: { t: [0.285, -0.07, 0.33], pole: [1, 0.25, -0.7] },
   // sw10: phone held to the ear — hand just outside the hijab, behind the cheek line, elbow out/down (phone attach sits between hand and head)
-  phone_ear: { t: [0.37, 0.02, 0.27], pole: [1, 0.1, -1] },
+  phone_ear: { t: [0.32, -0.03, 0.2], pole: [1, 0.1, -1] },
   forehead: { t: [0.03, -0.3, 0.43], pole: [1, 0, -0.7] },
   temple: { t: [0.27, -0.13, 0.36], pole: [1, 0.2, -0.6] },
   chin: { t: [0.03, -0.27, 0.12], pole: [1, 0.4, -1] },
