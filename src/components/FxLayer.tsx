@@ -8,7 +8,7 @@ import { rng } from '../three/math';
 export type Fx = {
   at: number;
   until: number;
-  type: 'speedlines' | 'shock' | 'sweat' | 'sparkle' | 'question' | 'burst' | 'flash' | 'tears' | 'thought' | 'stamp' | 'vignette' | 'rain' | 'notes' | 'diary' | 'gas' | 'bank' | 'chat' | 'card' | 'timer' | 'call' | 'siren' | 'blackout' | 'memory' | 'title';
+  type: 'speedlines' | 'shock' | 'sweat' | 'sparkle' | 'question' | 'burst' | 'flash' | 'tears' | 'thought' | 'stamp' | 'vignette' | 'rain' | 'notes' | 'diary' | 'gas' | 'bank' | 'chat' | 'card' | 'timer' | 'call' | 'siren' | 'blackout' | 'memory' | 'title' | 'vcall';
   start?: number;
   rate?: number;
   title?: string;
@@ -28,6 +28,8 @@ export type Fx = {
   color?: string;
   dx?: number;
   dy?: number;
+  pip?: string;
+  slip?: number;
 };
 
 /** Anime / manga style 2D accents layered over the toon 3D render. */
@@ -231,6 +233,40 @@ export const FxLayer: React.FC<{ fx: Fx[]; anchors: Record<string, AnchorTrack> 
                   <div style={{ color: red ? '#FF5A5F' : '#FFFFFF', fontWeight: 900, fontSize: 96, lineHeight: 1, letterSpacing: 4, opacity: blink, fontVariantNumeric: 'tabular-nums' }}>{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}</div>
                 </div>
               </div>
+            );
+          }
+          case 'vcall': {
+            // sw10: full-screen WhatsApp-style video call UI over the 3D 'phone camera' view (no fade-out: consecutive call scenes join)
+            const sec = Math.floor((e.start ?? 0) + local / fps);
+            const tm = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+            const jig = e.slip != null && local >= e.slip ? Math.max(0, 1 - (local - e.slip) / 10) : 0;
+            const jx = jig * 18 * Math.sin(local * 2.3), jy = jig * 12 * Math.cos(local * 1.7);
+            return (
+              <AbsoluteFill key={i} style={{ fontFamily: FONT, transform: `translate(${jx}px, ${jy}px)` }}>
+                <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 300, background: 'linear-gradient(rgba(0,0,0,0.62), rgba(0,0,0,0))' }} />
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 360, background: 'linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.6))' }} />
+                <div style={{ position: 'absolute', left: 60, top: 150, color: '#FFFFFF' }}>
+                  <div style={{ fontSize: 30, fontWeight: 700, opacity: 0.85, letterSpacing: 1 }}>🔒 Panggilan video</div>
+                  <div style={{ fontSize: 64, fontWeight: 900, marginTop: 4, textShadow: '0 3px 10px rgba(0,0,0,0.5)' }}>{e.title ?? 'Ibu ❤'}</div>
+                  <div style={{ fontSize: 38, fontWeight: 700, opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>{e.text ?? tm}</div>
+                </div>
+                {e.pip !== 'none' && (
+                  <div style={{ position: 'absolute', right: 50, top: 150, width: 220, height: 330, borderRadius: 28, overflow: 'hidden', border: '4px solid rgba(255,255,255,0.85)',
+                    background: 'linear-gradient(#3B4A6B, #1C2436)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)' }}>
+                    <div style={{ position: 'absolute', left: 30, right: 30, bottom: -40, height: 170, borderRadius: '50% 50% 20px 20px', background: '#DCE9F5' }} />
+                    <div style={{ position: 'absolute', left: 58, top: 70, width: 104, height: 118, borderRadius: '50%', background: '#E9B48C' }} />
+                    <div style={{ position: 'absolute', left: 52, top: 56, width: 116, height: 52, borderRadius: '60px 60px 20px 20px', background: '#1B1E2B' }} />
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 10, textAlign: 'center', color: '#FFFFFF', fontSize: 24, fontWeight: 800 }}>{e.pip ?? 'Kamu'}</div>
+                  </div>
+                )}
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, display: 'flex', justifyContent: 'center', gap: 56 }}>
+                  {['#3A3F4B', '#3A3F4B', '#3A3F4B', '#E5484D'].map((c, k) => (
+                    <div key={k} style={{ width: 118, height: 118, borderRadius: 999, background: c, opacity: 0.92, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 50, color: '#fff' }}>
+                      {['🎤', '📷', '🔄', '✆'][k]}
+                    </div>
+                  ))}
+                </div>
+              </AbsoluteFill>
             );
           }
           case 'call': {
