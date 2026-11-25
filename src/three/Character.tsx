@@ -197,7 +197,7 @@ export const Character: React.FC<{ id: string; look: Look; pose: CharPose; brain
               {look.outfit === 'hoodie' && <Prim kind="sphere" color={m.topDark} pos={[0, 0.1, 0.02]} scale={[0.17, 0.08, 0.07]} />}
               <N m={local.neck}>
                 <Prim kind="cyl" mat={m.skinBody} pos={[0, 0, 0.04]} scale={[0.055, 0.055, 0.09]} outline={0.006} />
-                {look.hairStyle === 'hijab' && <Prim kind="cone" mat={m.hair} pos={[0, 0.02, -0.02]} scale={[0.27, 0.19, 0.26]} args={{ seg: 32 }} outline={0.008} />}
+                {look.hairStyle === 'hijab' && <Prim kind="cone" mat={m.hair} pos={[0, 0.02, -0.02]} scale={[0.29, 0.25, 0.27]} args={{ seg: 32 }} outline={0.008} />}
                 {look.helmet && <Prim kind="torus" color="#C9D3E0" pos={[0, 0, 0.0]} scale={[0.16, 0.16, 0.2]} args={{ tube: 0.22, seg: 32 }} outline={0.006} />}
                 <N m={local.head}>
                   {look.helmet && (
