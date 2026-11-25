@@ -63,6 +63,7 @@ export const LOOKS: Record<string, Look> = {
   // SW03 keluarga besar (Generasi Sandwich)
   dimas_batik: { skin: '#E9B48C', hair: '#1B1E2B', hairStyle: 'side', outfit: 'tee', top: '#3E5C8A', topDark: '#2A4266', legs: '#2B2F3A' },
   ibu_daster: { skin: '#E3AE86', hair: '#B98A5E', hairStyle: 'hijab', outfit: 'tee', top: '#7E9C7A', topDark: '#5E7A5B', legs: '#4E5A4C' },
+  ibu_rs: { skin: '#E3AE86', hair: '#8C4A5E', hairStyle: 'hijab', outfit: 'tee', top: '#7E9C7A', topDark: '#5E7A5B', legs: '#4E5A4C' },
   bapak_koko: { skin: '#C98E66', hair: '#7D7D7D', hairStyle: 'round', outfit: 'tee', top: '#EDE6D6', topDark: '#C9BFA9', legs: '#3B3F4A', mustache: '#3A3A3A' },
   rina: { skin: '#EFC09A', hair: '#2A1A12', hairStyle: 'bob', outfit: 'tee', top: '#B8243C', topDark: '#8E1A2D', legs: '#2B1E26', glasses: false },
   om_hadi: { skin: '#D6A07A', hair: '#2A2A2A', hairStyle: 'round', outfit: 'tee', top: '#8A6A2E', topDark: '#6B5021', legs: '#2B2F3A', mustache: '#2A2A2A' },
